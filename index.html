@@ -237,6 +237,27 @@
     let operator = null;
     let overwriteCurrent = false;
 
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const playTone = (freq, duration = 0.08, vol = 0.15) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    };
+    const sound = {
+      digit: () => playTone(600, 0.06),
+      operator: () => playTone(800, 0.08),
+      equals: () => playTone(1000, 0.12, 0.2),
+      clear: () => playTone(300, 0.15, 0.2),
+      backspace: () => playTone(400, 0.06),
+      error: () => { playTone(200, 0.2, 0.2); setTimeout(() => playTone(150, 0.25, 0.2), 150); },
+    };
+
     const formatNumber = (num) => {
       if (!Number.isFinite(num)) return "Error";
       return new Intl.NumberFormat("en-US", { maximumFractionDigits: 10 }).format(num);
@@ -327,20 +348,24 @@
     };
 
     document.querySelectorAll("button[data-value]").forEach((btn) => {
-      btn.addEventListener("click", () => appendDigit(btn.dataset.value));
+      btn.addEventListener("click", () => { sound.digit(); appendDigit(btn.dataset.value); });
     });
 
     document.querySelectorAll("button[data-op]").forEach((btn) => {
-      btn.addEventListener("click", () => setOperator(btn.dataset.op));
+      btn.addEventListener("click", () => { sound.operator(); setOperator(btn.dataset.op); });
     });
 
     document.querySelectorAll("button[data-action]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const action = btn.dataset.action;
-        if (action === "clear") clearAll();
-        if (action === "backspace") backspace();
-        if (action === "percent") applyPercent();
-        if (action === "equals") calculate();
+        if (action === "clear") { sound.clear(); clearAll(); }
+        if (action === "backspace") { sound.backspace(); backspace(); }
+        if (action === "percent") { sound.operator(); applyPercent(); }
+        if (action === "equals") {
+          const hadError = current === "Error";
+          calculate();
+          if (current === "Error" && !hadError) sound.error(); else sound.equals();
+        }
       });
     });
 
